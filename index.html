@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light}html,body{height:auto}body{margin:0}</style>
+<script>
+try{ if(window.Voice&&Voice.isDark){ document.documentElement.setAttribute('data-theme', Voice.isDark()?'dark':'light'); } }catch(e){}
+</script>
+</head>
+<body>
+<title>Degrés</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the chord chart is the page. Entry (voice text, keypad) docks at the bottom on a phone and sits in a right column on a wide screen. */
+:root{
+  --bg:#eceef3; --surface:#f8f9fc; --well:#e1e5ed; --line:#ccd1dc; --line-soft:#d9dde6;
+  --fg:#151922; --muted:#586072;
+  --accent:#0a7d91; --accent-ink:#ffffff; --accent-wash:#d3ecf1;
+  --loop:#b86a00; --loop-ink:#ffffff; --loop-wash:#f5e3c6;
+  --f-display:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1218; --surface:#171b23; --well:#0b0e13; --line:#2a303c; --line-soft:#1f242e;
+    --fg:#e8ebf2; --muted:#98a2b5;
+    --accent:#4cc4da; --accent-ink:#05222a; --accent-wash:#12313a;
+    --loop:#f2a93b; --loop-ink:#1a1204; --loop-wash:#3a2a10;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1218; --surface:#171b23; --well:#0b0e13; --line:#2a303c; --line-soft:#1f242e;
+  --fg:#e8ebf2; --muted:#98a2b5;
+  --accent:#4cc4da; --accent-ink:#05222a; --accent-wash:#12313a;
+  --loop:#f2a93b; --loop-ink:#1a1204; --loop-wash:#3a2a10;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:var(--f-body); font-size:15px; line-height:1.45;
+  padding-inline:16px; padding-block:20px 24px;
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit;color:inherit}
+h1,h2,p{margin:0}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.app{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+.top{display:flex;flex-wrap:nowrap;align-items:flex-start;justify-content:space-between;gap:12px}
+.brand{display:flex;flex-direction:column;gap:4px;min-width:0}
+h1{font-family:var(--f-display);font-weight:400;font-size:48px;line-height:1;letter-spacing:-.01em}
+.tag{color:var(--muted);font-size:14px}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;padding:0 16px;border:1px solid var(--line);background:var(--surface);color:var(--fg);
+  border-radius:8px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{min-height:38px;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn svg{width:18px;height:18px;flex:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  min-height:38px;padding:0 13px;border-radius:999px;border:1px solid var(--line);background:transparent;
+  font-size:14px;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;
+}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+input[type=text],input[type=number],select{
+  font:inherit;font-size:16px;color:var(--fg);background:var(--well);
+  border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-height:42px;width:100%;min-width:0;
+}
+select{width:auto}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.ph{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.hint{color:var(--muted);font-size:13px}
+.lab{color:var(--muted);font-size:13px}
+
+/* layout */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;grid-template-areas:"settings" "board" "dock"}
+.settings{grid-area:settings}
+.board{grid-area:board;display:flex;flex-direction:column;gap:14px;min-width:0}
+.dock{grid-area:dock}
+@media (min-width:900px){
+  .layout{grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);grid-template-areas:"settings dock" "board dock";align-items:start}
+  .dock{position:sticky;top:16px}
+}
+@media (max-width:899px){
+  .dock{
+    position:sticky;bottom:0;z-index:5;margin-inline:-16px;border-radius:14px 14px 0 0;border-inline:0;border-bottom:0;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  }
+  h1{font-size:42px}
+}
+
+/* settings */
+.srow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.fld{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.fld select{color:var(--fg);font-weight:600}
+details.more summary{cursor:pointer;color:var(--muted);font-size:13px}
+details.more .inner{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+
+/* board */
+.banner{border:1px dashed var(--line);border-radius:8px;padding:10px 12px;color:var(--muted);font-size:13px}
+.board-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.board-bar .bpm{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.board-bar .bpm input{width:72px;min-height:38px}
+.sections{display:flex;flex-direction:column;gap:22px}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec-head{display:flex;align-items:center;gap:8px}
+input.sec-name{
+  font-family:var(--f-display);font-size:26px;line-height:1.1;background:transparent;border:0;border-bottom:1px dashed var(--line);
+  border-radius:0;padding:2px 0;min-height:38px;flex:1;min-width:0;
+}
+.sec.active input.sec-name{border-bottom-color:var(--accent)}
+.icon-btn{
+  display:inline-grid;place-items:center;width:38px;height:38px;flex:none;border:1px solid var(--line);background:transparent;
+  border-radius:8px;cursor:pointer;color:var(--muted);-webkit-tap-highlight-color:transparent;
+}
+.icon-btn:hover{color:var(--fg);border-color:var(--muted)}
+.icon-btn svg{width:18px;height:18px}
+.bars{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.bar{
+  position:relative;min-height:80px;padding:18px 6px 8px;border-left:2px solid var(--muted);border-top:1px solid var(--line-soft);
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:2px 10px;cursor:pointer;min-width:0;
+  scroll-margin-block:120px 360px;
+}
+.bar.first{border-left:0}
+.bar.toprow{border-top:0}
+.bar .no{position:absolute;top:4px;left:7px;font-family:var(--f-mono);font-size:10px;color:var(--muted);font-style:normal}
+.bar.empty{background:transparent}
+.bar.cur{background:var(--accent-wash);box-shadow:inset 0 0 0 2px var(--accent)}
+.bar.cur.ow{background:var(--loop-wash);box-shadow:inset 0 0 0 2px var(--loop)}
+.bar.playing{background:var(--accent);color:var(--accent-ink)}
+.bar.playing small,.bar.playing .no{color:var(--accent-ink)}
+.ch{display:flex;flex-direction:column;align-items:center;line-height:1.1;min-width:0}
+.ch b{font-size:23px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.ch b sup{font-size:.6em;vertical-align:baseline;position:relative;top:-.5em;font-weight:500}
+.ch small{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap}
+.ch small sup{font-size:.8em;vertical-align:baseline;position:relative;top:-.35em}
+.bar.n2 .ch b{font-size:19px}
+.bar.n3 .ch b,.bar.n4 .ch b{font-size:16px}
+.dash{color:var(--muted);font-size:20px}
+
+/* dock */
+.dock-row{display:flex;gap:8px;align-items:center}
+.say-wrap{display:flex;gap:8px;align-items:stretch}
+.say-wrap input{flex:1}
+.heard{font-size:13px;min-height:1.3em;color:var(--muted)}
+.switch-row{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.switch{position:relative;width:44px;height:26px;border-radius:999px;border:1px solid var(--line);background:var(--well);padding:0;cursor:pointer;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.switch[aria-checked="true"]{background:var(--accent);border-color:var(--accent)}
+.switch[aria-checked="true"]::after{transform:translateX(18px);background:var(--accent-ink)}
+details.padwrap summary{cursor:pointer;color:var(--muted);font-size:13px;padding-block:2px}
+.pad{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.degs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.deg{
+  min-height:52px;border:1px solid var(--line);background:var(--bg);border-radius:8px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;-webkit-tap-highlight-color:transparent;
+}
+.deg b{font-size:22px;font-weight:600;line-height:1}
+.deg small{font-family:var(--f-mono);font-size:10px;color:var(--muted);white-space:nowrap}
+.deg:active{background:var(--accent-wash)}
+.scrollrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.scrollrow .chip{flex:none;font-family:var(--f-mono);font-size:13px}
+.btn.mic{min-width:48px;padding:0 12px}
+.btn.mic svg{width:20px;height:20px}
+.btn.mic[aria-pressed="true"]{background:var(--loop);border-color:var(--loop);color:var(--loop-ink)}
+.acts{display:flex;gap:6px}
+.acts .btn{flex:1;min-width:0;padding:0 8px;font-size:13px;min-height:42px}
+
+@media (max-width:420px){
+  .ch b{font-size:21px}
+  .bar{padding-inline:3px}
+}
+@media (prefers-reduced-motion:reduce){ .switch::after{transition:none} }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Degrés</h1>
+      <p class="tag">Dis les degrés du morceau, la grille d'accords s'écrit.</p>
+    </div>
+    <button class="btn sm" id="btnNew" type="button">Nouvelle grille</button>
+  </header>
+
+  <main class="layout">
+    <section class="panel settings" id="settings">
+      <div class="srow">
+        <label class="fld" for="tonic">Tonalité <select id="tonic"></select></label>
+        <div class="chips" id="modeChips" role="group" aria-label="Mode">
+          <button class="chip" type="button" data-v="major" aria-pressed="true">Majeur</button>
+          <button class="chip" type="button" data-v="minor" aria-pressed="false">Mineur</button>
+        </div>
+      </div>
+      <details class="more">
+        <summary>Affichage et réglages</summary>
+        <div class="inner">
+      <div class="srow">
+        <span class="lab">En grand</span>
+        <div class="chips" id="dispChips" role="group" aria-label="Affichage principal">
+          <button class="chip" type="button" data-v="chords" aria-pressed="true">Accords</button>
+          <button class="chip" type="button" data-v="degrees" aria-pressed="false">Degrés</button>
+        </div>
+        <span class="lab">Noms</span>
+        <div class="chips" id="nameChips" role="group" aria-label="Noms des notes">
+          <button class="chip" type="button" data-v="letters" aria-pressed="true">C D E</button>
+          <button class="chip" type="button" data-v="solfege" aria-pressed="false">Do Ré Mi</button>
+        </div>
+      </div>
+          <div class="srow">
+            <span class="lab">Mesures par ligne</span>
+            <div class="chips" id="rowChips" role="group" aria-label="Mesures par ligne">
+              <button class="chip" type="button" data-v="2" aria-pressed="false">2</button>
+              <button class="chip" type="button" data-v="3" aria-pressed="false">3</button>
+              <button class="chip" type="button" data-v="4" aria-pressed="true">4</button>
+              <button class="chip" type="button" data-v="6" aria-pressed="false">6</button>
+            </div>
+          </div>
+          <div class="srow">
+            <span class="lab">Mesure suivante</span>
+            <div class="chips" id="advChips" role="group" aria-label="Passage à la mesure suivante">
+              <button class="chip" type="button" data-v="chord" aria-pressed="true">À chaque accord</button>
+              <button class="chip" type="button" data-v="word" aria-pressed="false">Quand je dis « mesure »</button>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="board" id="board">
+      <p class="banner" id="exBanner" hidden>Exemple : une grille en Sol majeur pour voir le résultat. Ajoute des degrés à la suite, ou touche « Nouvelle grille » pour repartir de zéro.</p>
+      <div class="board-bar">
+        <button class="btn sm primary" id="btnPlay" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="icoPlay"><path d="M8 5v14l11-7z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="icoStop" hidden><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+          <span id="playLabel">Écouter</span>
+        </button>
+        <label class="bpm" for="bpm">Tempo <input id="bpm" type="number" min="40" max="220" step="1" value="90" inputmode="numeric"> BPM</label>
+        <button class="btn sm" id="btnCopy" type="button">Copier la grille</button>
+      </div>
+      <p class="hint" id="boardMsg" role="status" aria-live="polite"></p>
+      <div class="sections" id="sections"></div>
+      <div><button class="btn" id="addSection" type="button">+ Nouvelle partie</button></div>
+      <textarea id="exportBox" rows="8" readonly hidden aria-label="Grille à copier" style="width:100%;font-family:var(--f-mono);font-size:13px;background:var(--well);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px"></textarea>
+    </section>
+
+    <section class="panel dock" id="dock" aria-label="Saisie des degrés">
+      <div class="say-wrap">
+        <input id="say" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="Dicte ou tape : un quatre cinq six mineur" aria-label="Degrés dictés ou tapés">
+        <button class="btn mic" id="btnMic" type="button" aria-pressed="false" aria-label="Parler" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+        <button class="btn primary" id="btnAdd" type="button">Ajouter</button>
+      </div>
+      <p class="heard" id="heard" role="status" aria-live="polite">Touche le micro de ton clavier et dis les degrés. Dis « mesure » pour passer à la mesure suivante.</p>
+      <div class="switch-row">
+        <button class="switch" id="autoSwitch" type="button" role="switch" aria-checked="true" aria-label="Ajout automatique après une pause"></button>
+        <span>Ajouter tout seul après une pause</span>
+      </div>
+      <details class="padwrap" open>
+        <summary>Pavé de degrés</summary>
+        <div class="pad">
+          <div class="degs" id="degs"></div>
+          <div class="scrollrow" id="mods">
+            <button class="chip" type="button" data-acc="-1" aria-pressed="false" aria-label="Bémol, pour le prochain degré">♭</button>
+            <button class="chip" type="button" data-acc="1" aria-pressed="false" aria-label="Dièse, pour le prochain degré">♯</button>
+            <button class="chip" type="button" data-mod="minor">m</button>
+            <button class="chip" type="button" data-mod="major">maj</button>
+            <button class="chip" type="button" data-mod="seventh">7</button>
+            <button class="chip" type="button" data-mod="maj7">maj7</button>
+            <button class="chip" type="button" data-mod="sus4">sus4</button>
+            <button class="chip" type="button" data-mod="dim">dim</button>
+            <button class="chip" type="button" data-mod="aug">aug</button>
+            <button class="chip" type="button" data-mod="ninth">9</button>
+            <button class="chip" type="button" data-mod="sixth">6</button>
+          </div>
+          <div class="acts">
+            <button class="btn" id="btnBar" type="button">Mesure ›</button>
+            <button class="btn" id="btnUndo" type="button">Annuler</button>
+            <button class="btn" id="btnClear" type="button">Vider</button>
+            <button class="btn" id="btnDel" type="button">Retirer</button>
+          </div>
+        </div>
+      </details>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+/* ---------- music tables ---------- */
+const OFF = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+const DQ = {
+  major: ['major', 'minor', 'minor', 'major', 'major', 'minor', 'dim'],
+  minor: ['minor', 'dim', 'major', 'minor', 'minor', 'major', 'major']
+};
+const L_SH = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const L_FL = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+const S_SH = ['Do', 'Do♯', 'Ré', 'Ré♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si'];
+const S_FL = ['Do', 'Ré♭', 'Ré', 'Mi♭', 'Mi', 'Fa', 'Sol♭', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+const FLAT_MAJ = new Set([1, 3, 5, 6, 8, 10]);
+
+const S = {
+  key: { t: 7, mode: 'major' }, disp: 'chords', names: 'letters', perRow: 4, advance: 'chord', auto: true, bpm: 90,
+  sections: [], cursor: { s: 0, b: 0 }, overwrite: false, nextSec: 1,
+  pendAcc: 0, example: false, undo: [], saveT: 0, autoT: 0
+};
+
+function flatsFor(t, mode) { return FLAT_MAJ.has(mode === 'minor' ? (t + 3) % 12 : t); }
+function nameOf(semi, flats) {
+  const arr = S.names === 'solfege' ? (flats ? S_FL : S_SH) : (flats ? L_FL : L_SH);
+  return arr[semi];
+}
+function rootSemi(c) { return (S.key.t + OFF[S.key.mode][c.d - 1] + c.a + 12) % 12; }
+function resolveQ(c) { return c.q || (c.a !== 0 ? 'major' : DQ[S.key.mode][c.d - 1]); }
+function sufOf(c) {
+  const q = resolveQ(c), e = c.e || '';
+  if (q === 'dim') { if (e === '7') return c.q ? 'dim7' : 'm7♭5'; return 'dim' + (e && e !== '7' ? e : ''); }
+  if (q === 'minor') return 'm' + (e === 'maj7' ? 'Maj7' : e);
+  if (q === 'aug') return 'aug' + e;
+  if (q === 'sus2' || q === 'sus4') return e === '7' ? '7' + q : q + (e && e !== '7' ? e : '');
+  return e;
+}
+function chordLetter(c) {
+  const flats = c.a < 0 ? true : c.a > 0 ? false : flatsFor(S.key.t, S.key.mode);
+  return nameOf(rootSemi(c), flats) + sufOf(c);
+}
+function degText(c) { return (c.a < 0 ? '♭' : c.a > 0 ? '♯' : '') + c.d + sufOf(c); }
+function supHtml(s) {
+  const i = s.search(/[0-9]/);
+  return i < 0 ? s : s.slice(0, i) + '<sup>' + s.slice(i) + '</sup>';
+}
+function degHtml(c) { return (c.a < 0 ? '♭' : c.a > 0 ? '♯' : '') + c.d + supHtml(sufOf(c)); }
+function letterHtml(c) {
+  const flats = c.a < 0 ? true : c.a > 0 ? false : flatsFor(S.key.t, S.key.mode);
+  return nameOf(rootSemi(c), flats) + supHtml(sufOf(c));
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function dispName(c) { return S.disp === 'chords' ? chordLetter(c) : degText(c); }
+
+/* ---------- reading what the person says or types ---------- */
+const DEG = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7 };
+const ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7 };
+const BAR_WORDS = new Set(['mesure', 'mesures', 'barre', 'barres', '|']);
+const FILL = new Set(['puis', 'et', 'ensuite', 'apres', 'alors', 'donc', 'euh', 'ok', 'le', 'la', 'les', 'de', 'du', 'des', 'accord', 'accords', 'degre', 'degres', 'sur', 'en', 'pour', 'suivant', 'suivante', 'avec', 'a', 'au', 'aux']);
+const MOD_WORDS = {
+  mineur: 'minor', mineure: 'minor', min: 'minor', majeur: 'major', majeure: 'major', maj: 'major',
+  diminue: 'dim', diminuee: 'dim', dim: 'dim', augmente: 'aug', augmentee: 'aug', aug: 'aug',
+  septieme: 'seventh', neuvieme: 'ninth', sixte: 'sixth'
+};
+const SUF = {
+  m: ['minor'], min: ['minor'], '-': ['minor'], maj: ['major'], dim: ['dim'], '°': ['dim'], aug: ['aug'], '+': ['aug'],
+  sus: ['sus4'], sus4: ['sus4'], sus2: ['sus2'], maj7: ['major', 'seventh'], m7: ['minor', 'seventh'],
+  min7: ['minor', 'seventh'], '-7': ['minor', 'seventh'], dim7: ['dim', 'seventh'], m9: ['minor', 'ninth'], m6: ['minor', 'sixth']
+};
+function parseInput(raw) {
+  let s = raw.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  s = s.replace(/[,;:.!?()]/g, ' ').replace(/[–—]/g, ' ').replace(/\|/g, ' | ')
+    .replace(/♭/g, ' bemol ').replace(/♯/g, ' diese ').replace(/#/g, ' diese ').replace(/(\w)-(?=\w)/g, '$1 ').replace(/\//g, ' ');
+  const toks = s.split(/\s+/).filter(Boolean);
+  const ops = [], unknown = [];
+  let pendAcc = 0, curChord = null, curMod = null;
+  const newChord = (d, extraMods, roman) => {
+    const op = { t: 'chord', d, a: pendAcc, mods: extraMods ? extraMods.slice() : [], roman: roman || null };
+    pendAcc = 0; ops.push(op); curChord = op; curMod = null;
+  };
+  const addMods = list => {
+    if (curChord) { list.forEach(m => curChord.mods.push(m)); return; }
+    if (!curMod) { curMod = { t: 'mod', mods: [] }; ops.push(curMod); }
+    list.forEach(m => curMod.mods.push(m));
+  };
+  for (let i = 0; i < toks.length; i++) {
+    const tk = toks[i], lw = tk.toLowerCase();
+    if (BAR_WORDS.has(lw)) { ops.push({ t: 'bar' }); curChord = null; curMod = null; continue; }
+    if (FILL.has(lw)) continue;
+    if (lw === 'bemol' || lw === 'bemols') { pendAcc = -1; continue; }
+    if (lw === 'diese' || lw === 'dieses') { pendAcc = 1; continue; }
+    if (DEG[lw]) { newChord(DEG[lw]); continue; }
+    if (/^[1-7]{2,}$/.test(lw)) { lw.split('').forEach(ch => newChord(+ch)); continue; }
+    let m = /^(b?)([1-7])([a-z°+\-]*[0-9]?)$/.exec(lw);
+    if (m && (m[3] === '' || SUF[m[3]])) {
+      if (m[1]) pendAcc = -1;
+      newChord(+m[2], m[3] ? SUF[m[3]] : null);
+      continue;
+    }
+    if (/^[ivIV]+$/.test(tk) && ROMAN[lw]) {
+      newChord(ROMAN[lw], null, tk === tk.toLowerCase() ? 'minor' : 'major');
+      continue;
+    }
+    if (lw === 'sus') {
+      let n = 4; const nx = (toks[i + 1] || '').toLowerCase();
+      if (nx === '2' || nx === 'deux') { n = 2; i++; } else if (nx === '4' || nx === 'quatre') { n = 4; i++; }
+      addMods(['sus' + n]); continue;
+    }
+    if (MOD_WORDS[lw]) { addMods([MOD_WORDS[lw]]); continue; }
+    if (SUF[lw]) { addMods(SUF[lw]); continue; }
+    unknown.push(tk);
+  }
+  return { ops, unknown, pending: pendAcc !== 0 };
+}
+
+function applyMod(c, m) {
+  switch (m) {
+    case 'minor': case 'dim': case 'aug': case 'sus2': case 'sus4':
+      c.q = m; break;
+    case 'major':
+      c.q = 'major'; c.mj = true; if (c.e === '7') c.e = 'maj7'; break;
+    case 'seventh': c.e = c.mj ? 'maj7' : '7'; break;
+    case 'maj7': c.q = 'major'; c.mj = true; c.e = 'maj7'; break;
+    case 'ninth': c.e = '9'; break;
+    case 'sixth': c.e = '6'; break;
+  }
+}
+function newBarsEnsure(sec, b) { while (sec.bars.length <= b) sec.bars.push([]); }
+function chordBeforeCursor(sec) {
+  const b = S.cursor.b;
+  if (sec.bars[b] && sec.bars[b].length) return sec.bars[b][sec.bars[b].length - 1];
+  for (let i = Math.min(b, sec.bars.length) - 1; i >= 0; i--) if (sec.bars[i].length) return sec.bars[i][sec.bars[i].length - 1];
+  return null;
+}
+function trimTail(sec) {
+  const keep = S.cursor.s === S.sections.indexOf(sec) ? S.cursor.b : -1;
+  while (sec.bars.length && !sec.bars[sec.bars.length - 1].length && sec.bars.length - 1 > keep) sec.bars.pop();
+}
+function applyOps(ops) {
+  const res = { added: [], modified: [], missed: false };
+  if (!ops.length) return res;
+  pushUndo();
+  S.example = false;
+  const sec = S.sections[S.cursor.s];
+  for (const op of ops) {
+    if (op.t === 'chord') {
+      const b = S.cursor.b; newBarsEnsure(sec, b);
+      if (S.overwrite) { sec.bars[b] = []; S.overwrite = false; }
+      const c = { d: op.d, a: op.a, q: null, e: '', mj: false };
+      op.mods.forEach(m => applyMod(c, m));
+      if (op.roman === 'minor') c.q = 'minor';
+      else if (op.roman === 'major' && DQ[S.key.mode][c.d - 1] !== 'major' && !c.q) c.q = 'major';
+      sec.bars[b].push(c); res.added.push(c);
+      if (S.advance === 'chord') { S.cursor.b = b + 1; S.overwrite = !!(sec.bars[b + 1] && sec.bars[b + 1].length); }
+    } else if (op.t === 'bar') {
+      const b = S.cursor.b;
+      if (sec.bars[b] && sec.bars[b].length) { S.cursor.b = b + 1; S.overwrite = !!(sec.bars[b + 1] && sec.bars[b + 1].length); }
+    } else if (op.t === 'mod') {
+      const c = chordBeforeCursor(sec);
+      if (c) { op.mods.forEach(m => applyMod(c, m)); res.modified.push(c); } else res.missed = true;
+    }
+  }
+  trimTail(sec);
+  save(); renderBoard(); updatePad(); scrollToCursor();
+  return res;
+}
+
+/* ---------- undo, save, restore ---------- */
+function snapshot() { return JSON.stringify({ sections: S.sections, cursor: S.cursor, overwrite: S.overwrite, nextSec: S.nextSec }); }
+function pushUndo() { S.undo.push(snapshot()); if (S.undo.length > 80) S.undo.shift(); }
+function undo() {
+  const raw = S.undo.pop();
+  if (!raw) { heard('Rien à annuler.'); return; }
+  const d = JSON.parse(raw);
+  S.sections = d.sections; S.cursor = d.cursor; S.overwrite = d.overwrite; S.nextSec = d.nextSec;
+  save(); renderBoard(); heard('Dernière action annulée.');
+}
+function save() {
+  clearTimeout(S.saveT);
+  S.saveT = setTimeout(() => {
+    try {
+      localStorage.setItem('degres:v1', JSON.stringify({
+        key: S.key, disp: S.disp, names: S.names, perRow: S.perRow, advance: S.advance, auto: S.auto, bpm: S.bpm,
+        sections: S.sections, cursor: S.cursor, nextSec: S.nextSec, example: S.example
+      }));
+    } catch (e) {}
+  }, 250);
+}
+const ch = (d, q, e) => ({ d, a: 0, q: q || null, e: e || '', mj: false });
+function exampleSections() {
+  return [
+    { id: 1, name: 'Couplet', bars: [[ch(1)], [ch(5)], [ch(6)], [ch(4)]] },
+    { id: 2, name: 'Refrain', bars: [[ch(4)], [ch(1)], [ch(5)], [ch(5)]] }
+  ];
+}
+function load() {
+  let d = null;
+  try { const raw = localStorage.getItem('degres:v1'); if (raw) d = JSON.parse(raw); } catch (e) {}
+  if (d && Array.isArray(d.sections) && d.sections.length) {
+    Object.assign(S, { key: d.key || S.key, disp: d.disp || 'chords', names: d.names || 'letters', perRow: d.perRow || 4,
+      advance: d.advance || 'chord', auto: d.auto !== false, bpm: d.bpm || 90, sections: d.sections,
+      cursor: d.cursor || { s: 0, b: 0 }, nextSec: d.nextSec || 10, example: !!d.example });
+    if (!S.sections[S.cursor.s]) S.cursor = { s: 0, b: 0 };
+  } else {
+    S.sections = exampleSections(); S.nextSec = 3; S.example = true;
+    S.cursor = { s: 1, b: 4 };
+  }
+}
+
+/* ---------- rendering ---------- */
+function barHtml(s, b, bar, active) {
+  const isCur = active && S.cursor.b === b;
+  const cls = ['bar'];
+  if (b % S.perRow === 0) cls.push('first');
+  if (b < S.perRow) cls.push('toprow');
+  if (!bar || !bar.length) cls.push('empty'); else cls.push('n' + Math.min(bar.length, 4));
+  if (isCur) { cls.push('cur'); if (S.overwrite && bar && bar.length) cls.push('ow'); }
+  const inner = bar && bar.length
+    ? bar.map(c => {
+        const main = S.disp === 'chords' ? letterHtml(c) : degHtml(c);
+        const sec2 = S.disp === 'chords' ? degHtml(c) : letterHtml(c);
+        return `<span class="ch"><b>${main}</b><small>${sec2}</small></span>`;
+      }).join('')
+    : '<span class="dash" aria-hidden="true">–</span>';
+  return `<div class="${cls.join(' ')}" role="button" tabindex="0" data-s="${s}" data-b="${b}" aria-label="Mesure ${b + 1}"><i class="no">${b + 1}</i>${inner}</div>`;
+}
+function renderBoard() {
+  $('#exBanner').hidden = !S.example;
+  $('#sections').innerHTML = S.sections.map((sec, si) => {
+    const active = si === S.cursor.s;
+    const slots = Math.max(sec.bars.length, active ? S.cursor.b + 1 : 0, 1);
+    const total = Math.ceil(slots / S.perRow) * S.perRow;
+    let cells = '';
+    for (let b = 0; b < total; b++) cells += barHtml(si, b, sec.bars[b], active);
+    return `<div class="sec${active ? ' active' : ''}" data-si="${si}">
+      <div class="sec-head">
+        <input class="sec-name" id="sn-${sec.id}" type="text" value="${esc(sec.name)}" aria-label="Nom de la partie" placeholder="Nom de la partie">
+        <button class="icon-btn" type="button" data-sact="del" title="Supprimer la partie" aria-label="Supprimer la partie"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      </div>
+      <div class="bars" style="--cols:${S.perRow}">${cells}</div>
+    </div>`;
+  }).join('');
+}
+function scrollToCursor() {
+  const el = document.querySelector('.bar.cur');
+  if (el && el.scrollIntoView) {
+    const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' });
+  }
+}
+function tonicLabel(t) { return nameOf(t, flatsFor(t, S.key.mode)); }
+function fillTonic() {
+  const sel = $('#tonic');
+  sel.innerHTML = '';
+  for (let t = 0; t < 12; t++) {
+    const o = document.createElement('option'); o.value = String(t); o.textContent = tonicLabel(t); sel.appendChild(o);
+  }
+  sel.value = String(S.key.t);
+}
+function setPressed(sel, v) { $$(sel + ' .chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.v === String(v)))); }
+function updateSettings() {
+  fillTonic();
+  setPressed('#modeChips', S.key.mode); setPressed('#dispChips', S.disp); setPressed('#nameChips', S.names);
+  setPressed('#rowChips', S.perRow); setPressed('#advChips', S.advance);
+  $('#autoSwitch').setAttribute('aria-checked', String(S.auto));
+  $('#bpm').value = S.bpm;
+}
+function buildPad() {
+  $('#degs').innerHTML = [1, 2, 3, 4, 5, 6, 7].map(d => `<button class="deg" type="button" data-d="${d}" aria-label="Degré ${d}"><b>${d}</b><small></small></button>`).join('');
+}
+function updatePad() {
+  $$('#degs .deg').forEach(b => {
+    const c = { d: +b.dataset.d, a: S.pendAcc, q: null, e: '', mj: false };
+    b.querySelector('b').textContent = (S.pendAcc < 0 ? '♭' : S.pendAcc > 0 ? '♯' : '') + b.dataset.d;
+    b.querySelector('small').textContent = chordLetter(c);
+  });
+  $$('#mods [data-acc]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.acc === S.pendAcc)));
+}
+function renderAll() { updateSettings(); renderBoard(); updatePad(); }
+
+/* ---------- feedback ---------- */
+function heard(msg) { $('#heard').textContent = msg; }
+function boardMsg(msg) { $('#boardMsg').textContent = msg; }
+function commit(prefix) {
+  clearTimeout(S.autoT);
+  const raw = $('#say').value;
+  if (!raw.trim()) return;
+  const r = parseInput(raw);
+  const quote = r.unknown.map(u => '« ' + u + ' »').join(' ');
+  const pre = prefix ? prefix + ' → ' : '';
+  if (!r.ops.length) { heard(pre + (r.unknown.length ? 'Rien compris : ' + quote : 'Rien à ajouter.')); return; }
+  const res = applyOps(r.ops);
+  $('#say').value = '';
+  const parts = [];
+  if (res.added.length) parts.push('Ajouté : ' + res.added.map(dispName).join(' · '));
+  if (res.modified.length) parts.push('Modifié : ' + res.modified.map(dispName).join(' · '));
+  if (res.missed) parts.push('Aucun accord à modifier');
+  if (r.unknown.length) parts.push('Non compris : ' + quote);
+  heard(pre + parts.join(' — '));
+}
+$('#btnAdd').addEventListener('click', () => commit());
+$('#say').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+$('#say').addEventListener('input', () => {
+  clearTimeout(S.autoT);
+  if (!S.auto) return;
+  const r = parseInput($('#say').value);
+  if (r.pending || !r.ops.length) return;
+  S.autoT = setTimeout(() => commit(), 1300);
+});
+$('#autoSwitch').addEventListener('click', () => { S.auto = !S.auto; $('#autoSwitch').setAttribute('aria-checked', String(S.auto)); save(); });
+
+/* ---------- keypad ---------- */
+$('#degs').addEventListener('click', e => {
+  const b = e.target.closest('.deg'); if (!b) return;
+  const a = S.pendAcc; S.pendAcc = 0;
+  const res = applyOps([{ t: 'chord', d: +b.dataset.d, a, mods: [], roman: null }]);
+  if (res.added.length) heard('Ajouté : ' + dispName(res.added[0]));
+});
+$('#mods').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  if (b.dataset.acc) { const v = +b.dataset.acc; S.pendAcc = S.pendAcc === v ? 0 : v; updatePad(); return; }
+  const m = b.dataset.mod;
+  const mods = m === 'maj7' ? ['major', 'seventh'] : [m];
+  const res = applyOps([{ t: 'mod', mods }]);
+  if (res.modified.length) heard('Modifié : ' + dispName(res.modified[0])); else if (res.missed) heard('Aucun accord à modifier.');
+});
+$('#btnBar').addEventListener('click', () => applyOps([{ t: 'bar' }]));
+$('#btnUndo').addEventListener('click', undo);
+$('#btnClear').addEventListener('click', () => {
+  const sec = S.sections[S.cursor.s];
+  if (!sec.bars[S.cursor.b] || !sec.bars[S.cursor.b].length) { heard('Cette mesure est déjà vide.'); return; }
+  pushUndo(); sec.bars[S.cursor.b] = []; S.overwrite = false; trimTail(sec); save(); renderBoard(); heard('Mesure vidée.');
+});
+$('#btnDel').addEventListener('click', () => {
+  const sec = S.sections[S.cursor.s];
+  if (S.cursor.b >= sec.bars.length) { heard('Il n\'y a pas de mesure à retirer ici.'); return; }
+  pushUndo(); sec.bars.splice(S.cursor.b, 1); S.overwrite = false; trimTail(sec); save(); renderBoard(); heard('Mesure retirée.');
+});
+
+/* ---------- board interaction ---------- */
+function setCursor(s, b) {
+  const sec = S.sections[s]; if (!sec) return;
+  S.cursor = { s, b };
+  S.overwrite = !!(sec.bars[b] && sec.bars[b].length);
+  S.sections.forEach((x, i) => { if (i !== s) trimTail(x); });
+  renderBoard();
+}
+$('#sections').addEventListener('click', e => {
+  const del = e.target.closest('[data-sact="del"]');
+  if (del) {
+    const si = +del.closest('.sec').dataset.si;
+    if (S.sections.length === 1) { heard('Il faut garder au moins une partie.'); return; }
+    pushUndo(); S.sections.splice(si, 1);
+    S.cursor = { s: Math.min(si, S.sections.length - 1), b: S.sections[Math.min(si, S.sections.length - 1)].bars.length };
+    S.overwrite = false; save(); renderBoard(); heard('Partie supprimée. Tu peux annuler.');
+    return;
+  }
+  const bar = e.target.closest('.bar');
+  if (bar) setCursor(+bar.dataset.s, +bar.dataset.b);
+});
+$('#sections').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('bar')) {
+    e.preventDefault(); setCursor(+e.target.dataset.s, +e.target.dataset.b);
+  }
+});
+$('#sections').addEventListener('input', e => {
+  if (!e.target.classList.contains('sec-name')) return;
+  const si = +e.target.closest('.sec').dataset.si;
+  S.sections[si].name = e.target.value; save();
+});
+$('#addSection').addEventListener('click', () => {
+  pushUndo();
+  S.sections.push({ id: S.nextSec++, name: 'Partie ' + (S.sections.length + 1), bars: [] });
+  S.cursor = { s: S.sections.length - 1, b: 0 }; S.overwrite = false; S.example = false;
+  save(); renderBoard(); heard('Nouvelle partie. Dis les degrés pour la remplir.');
+  const el = document.querySelector('.sec.active'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+});
+$('#btnNew').addEventListener('click', () => {
+  pushUndo();
+  S.sections = [{ id: S.nextSec++, name: 'Partie 1', bars: [] }];
+  S.cursor = { s: 0, b: 0 }; S.overwrite = false; S.example = false;
+  stopPlay(); save(); renderBoard(); heard('Grille vide. Tu peux annuler.');
+});
+
+/* ---------- settings ---------- */
+$('#tonic').addEventListener('change', e => { S.key.t = +e.target.value; save(); renderAll(); });
+$('#modeChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.key.mode = c.dataset.v; save(); renderAll(); });
+$('#dispChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.disp = c.dataset.v; save(); renderAll(); });
+$('#nameChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.names = c.dataset.v; save(); renderAll(); });
+$('#rowChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.perRow = +c.dataset.v; save(); renderAll(); });
+$('#advChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; S.advance = c.dataset.v; save(); updateSettings(); });
+$('#bpm').addEventListener('input', e => { const v = +e.target.value; if (v >= 40 && v <= 220) { S.bpm = v; save(); } });
+
+/* ---------- copy ---------- */
+function gridText() {
+  const flats = flatsFor(S.key.t, S.key.mode);
+  const lines = [nameOf(S.key.t, flats) + (S.key.mode === 'minor' ? ' mineur' : ' majeur') + ', ' + S.bpm + ' BPM'];
+  S.sections.forEach(sec => {
+    if (!sec.bars.length) return;
+    lines.push('', sec.name);
+    for (let i = 0; i < sec.bars.length; i += S.perRow) {
+      const row = sec.bars.slice(i, i + S.perRow);
+      lines.push('| ' + row.map(b => b.length ? b.map(chordLetter).join(' ') : '–').join(' | ') + ' |');
+      lines.push('| ' + row.map(b => b.length ? b.map(degText).join(' ') : '–').join(' | ') + ' |');
+    }
+  });
+  return lines.join('\n');
+}
+$('#btnCopy').addEventListener('click', async () => {
+  const txt = gridText();
+  try { await navigator.clipboard.writeText(txt); $('#exportBox').hidden = true; boardMsg('Grille copiée.'); }
+  catch (e) {
+    const ta = $('#exportBox'); ta.hidden = false; ta.value = txt; ta.focus(); ta.select();
+    boardMsg('La copie automatique est refusée ici. Le texte est sélectionné, copie-le à la main.');
+  }
+});
+
+/* ---------- playback to check the chart by ear ---------- */
+let _ac = null, play = null;
+function ac() { if (!_ac) { const C = window.AudioContext || window.webkitAudioContext; _ac = new C(); } return _ac; }
+function chordNotes(c) {
+  const base = 48 + rootSemi(c), q = resolveQ(c), e = c.e || '';
+  let iv;
+  switch (q) {
+    case 'minor': iv = [0, 3, 7]; break;
+    case 'dim': iv = [0, 3, 6]; break;
+    case 'aug': iv = [0, 4, 8]; break;
+    case 'sus2': iv = [0, 2, 7]; break;
+    case 'sus4': iv = [0, 5, 7]; break;
+    default: iv = [0, 4, 7];
+  }
+  if (e === '7') iv.push(q === 'dim' && c.q ? 9 : 10);
+  else if (e === 'maj7') iv.push(11);
+  else if (e === '9') iv.push(10, 14);
+  else if (e === '6') iv.push(9);
+  return { bass: base - 12, notes: iv.map(i => base + 12 + i) };
+}
+function setPlayUI(on) {
+  $('#icoPlay').hidden = on; $('#icoStop').hidden = !on;
+  $('#playLabel').textContent = on ? 'Arrêter' : 'Écouter';
+}
+function stopPlay() {
+  if (!play) return;
+  clearInterval(play.timer);
+  const c = ac(), t = c.currentTime;
+  play.master.gain.cancelScheduledValues(t); play.master.gain.setValueAtTime(play.master.gain.value, t);
+  play.master.gain.linearRampToValueAtTime(0.0001, t + 0.05);
+  play.oscs.forEach(o => { try { o.stop(t + 0.08); } catch (e) {} });
+  play = null; setPlayUI(false);
+  $$('.bar.playing').forEach(el => el.classList.remove('playing'));
+}
+function startPlay() {
+  const c = ac(); if (c.state === 'suspended') c.resume();
+  const beat = 60 / S.bpm, barLen = beat * 4;
+  const master = c.createGain(); master.gain.value = 1; master.connect(c.destination);
+  const oscs = [], line = [];
+  let t = c.currentTime + 0.12;
+  const tone = (t0, midi, dur, vol, type) => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+    g.gain.setValueAtTime(vol, t0 + Math.max(0.02, dur - 0.12)); g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.02); oscs.push(o);
+  };
+  let any = false;
+  S.sections.forEach((sec, si) => sec.bars.forEach((bar, bi) => {
+    line.push({ t0: t, t1: t + barLen, s: si, b: bi });
+    if (bar.length) {
+      any = true;
+      const each = barLen / bar.length;
+      bar.forEach((cd, k) => {
+        const ns = chordNotes(cd), t0 = t + k * each;
+        tone(t0, ns.bass, each * 0.97, 0.2, 'sine');
+        ns.notes.forEach(n => tone(t0, n, each * 0.97, 0.09, 'triangle'));
+      });
+    }
+    t += barLen;
+  }));
+  if (!any) { boardMsg('La grille est vide, il n\'y a rien à écouter.'); master.disconnect(); return; }
+  const end = t;
+  play = { master, oscs, timer: 0 };
+  setPlayUI(true);
+  let last = null;
+  play.timer = setInterval(() => {
+    const now = c.currentTime;
+    if (now >= end) { stopPlay(); return; }
+    const cur = line.find(x => now >= x.t0 && now < x.t1);
+    if (cur === last) return;
+    last = cur;
+    $$('.bar.playing').forEach(el => el.classList.remove('playing'));
+    if (cur) { const el = document.querySelector(`.bar[data-s="${cur.s}"][data-b="${cur.b}"]`); if (el) el.classList.add('playing'); }
+  }, 50);
+  boardMsg('');
+}
+$('#btnPlay').addEventListener('click', () => { if (play) stopPlay(); else startPlay(); });
+
+/* ---------- native voice (only inside the Android app) ---------- */
+(function () {
+  const V = window.Voice;
+  if (!V || typeof V.start !== 'function') return;
+  const mic = $('#btnMic');
+  let listening = false;
+  mic.hidden = false;
+  heard('Appuie sur le micro et dis les degrés : « un, quatre, cinq, six mineur ».');
+  mic.addEventListener('click', () => { if (listening) V.stop(); else V.start(); });
+  const setListening = on => {
+    listening = on;
+    mic.setAttribute('aria-pressed', String(on));
+    mic.setAttribute('aria-label', on ? 'Arrêter l\'écoute' : 'Parler');
+  };
+  window.onNativeSpeech = (kind, text) => {
+    if (kind === 'state') {
+      if (text === 'listening') { setListening(true); heard('Je t\'écoute. Dis les degrés.'); }
+      else if (text === 'idle') { setListening(false); }
+      else if (text === 'error:permission') { setListening(false); heard('Autorise le micro dans les réglages de l\'appli pour pouvoir parler.'); }
+      else if (text === 'error:unavailable') { setListening(false); heard('La reconnaissance vocale n\'est pas disponible sur ce téléphone.'); }
+      else if (text === 'error:network') { setListening(false); heard('La reconnaissance vocale a besoin du réseau. Vérifie ta connexion.'); }
+      else { setListening(false); heard('La reconnaissance vocale s\'est arrêtée (' + text.replace('error:', '') + '). Touche le micro pour reprendre.'); }
+      return;
+    }
+    if (!text) return;
+    if (kind === 'partial') { $('#say').value = text; heard('J\'entends : ' + text); return; }
+    if (kind === 'final') { $('#say').value = text; commit('Entendu : « ' + text + ' »'); }
+  };
+})();
+
+/* ---------- start ---------- */
+load();
+buildPad();
+renderAll();
+if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) $('#say').focus();
+})();
+</script>
+
+</body>
+</html>
